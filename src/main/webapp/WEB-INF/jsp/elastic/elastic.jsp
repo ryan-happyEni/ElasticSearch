@@ -58,25 +58,40 @@
 		<hr>
 		<div class="el_control_section">
 			<div class="row">
-				<div class="col w70">
+				<div class="col w100">
 					<div class="row">
-						<div class="col w50 tx_right"><span>Index</span>&nbsp;&nbsp;</div>
-						<div class="col w50 tx_left"><input type="text" id="index" value="bigcode_index"></div>
+						<div class="col w30 tx_right"><span>Index</span>&nbsp;&nbsp;</div>
+						<div class="col w70 tx_left"><input type="text" id="index" value="bigcode_index"></div>
 					</div>
 					<div class="row">
-						<div class="col w50 tx_right"><span>Type</span>&nbsp;&nbsp;</div>
-						<div class="col w50 tx_left"><input type="text" id="type" value="tweet"></div>
+						<div class="col w30 tx_right"><span>Type</span>&nbsp;&nbsp;</div>
+						<div class="col w70 tx_left"><input type="text" id="type" value="tweet"></div>
 					</div>
 					<div class="row">
-						<div class="col w50 tx_right"><span>Id</span>&nbsp;&nbsp;</div>
-						<div class="col w50 tx_left"><input type="text" id="id" value="1"></div>
+						<div class="col w30 tx_right"><span>Id</span>&nbsp;&nbsp;</div>
+						<div class="col w70 tx_left"><input type="text" id="id" value="1"></div>
 					</div>
 					<div class="row">
-						<div class="col w50 tx_right"><span>Search Query (split[/])</span>&nbsp;&nbsp;</div>
-						<div class="col w50 tx_left"><input type="text" id="_search" value=""></div>
+						<div class="col w30 tx_right"><span>Search Query</span>&nbsp;&nbsp;</div>
+						<div class="col w70 tx_left">
+							<input type="text" id="_search" value="">
+							<input type="checkbox" id="_fuzziness" value="" checked>
+							<select id="_search_size">
+								<option value="1">1</option>
+								<option value="5" selected>5</option>
+								<option value="10">10</option>
+								<option value="20">20</option>
+								<option value="50">50</option>
+								<option value="100">100</option>
+							</select>
+						</div>
 					</div>
-				</div>
-				<div class="col w30">
+					<div class="row">
+						<div class="col w30 tx_right"><span>Query(params)</span>&nbsp;&nbsp;</div>
+						<div class="col w70 tx_left">
+							<textarea id="_search_params" style="width:100%;height:109px;border:1px solid #cdcdcd;"></textarea>
+						</div>
+					</div>
 				</div>
 			</div>
 			<div class="row">
@@ -131,7 +146,7 @@
 		
 		function processOff(){}
 		
-		function addColumn(){
+		function addColumn(key, value){
 			var row = document.createElement("div");
 			$("#rows").append(row);
 			row.className="row";
@@ -147,6 +162,7 @@
 
 			var chk = document.createElement("input");
 			txtdiv.appendChild(chk);
+			chk.className="check";
 			chk.type="checkbox";
 			chk.value="row_"+rowidx;
 
@@ -155,6 +171,9 @@
 			inp.type="text";
 			inp.id="key_"+rowidx;
 			inp.style="width:90%";
+			if(key!=null){
+				inp.value=key;
+			}
 
 
 			var col = document.createElement("div");
@@ -170,13 +189,16 @@
 			inp.type="text";
 			inp.id="value_"+rowidx;
 			inp.style="width:90%";
+			if(value!=null){
+				inp.value=value;
+			}
 			
 			rowidx++;
 		}
 
 		
 		function delColumn(){
-			var chks = $("input[type=checkbox]:checked");
+			var chks = $(".check:checked");
 			if(chks.length>0){
 				for(var i=chks.length-1; i>=0; i--){
 					$("#"+chks[i].value).remove();
@@ -187,7 +209,7 @@
 		
 		
 		var data_idx=0;
-		function addRow(data){
+		function addRow(data, isSearch){
 			data_idx=0;
 			
 			if(data.length==null && data.length == undefined){
@@ -214,18 +236,40 @@
 					col.innerHTML=key;
 				}
 				
-				for(var i=0; i<size; i++){
+
+				$.each(data, function( index, value ) {
 					var row = document.createElement("tr");
 					datas.append(row);
 					row.className="row";
 					row.id="data_"+data_idx;
-					for(var key in data[i]){
+					row.style.cursor="pointer";
+					
+					for(var key in value){
 						var col = document.createElement("td");
 						row.appendChild(col);
 						row.className="row";
-						col.innerHTML=data[i][key];
+						col.innerHTML=value[key];
 					}
-				}
+					
+					
+					row.ondblclick=function(){
+						$("#rows").empty();
+						if(isSearch){
+							$("#index").val(value.index);
+							$("#type").val(value.type);
+							$("#id").val(value.id);
+							for(var key in value.sourceAsMap){
+								addColumn(key, value.sourceAsMap[key])
+							}
+						}else{
+							for(var key in value){
+								addColumn(key, value[key])
+							}
+						}
+						$("#datas > tbody > tr").css("backgroundColor", "");
+						this.style.backgroundColor="#cdcdcd";
+					}
+				});
 			}
 			
 		}
@@ -235,7 +279,7 @@
 			var height=window.innerHeight-top_bottom;
 			
 			$("#datas_section").css("height", height-300);
-			$("#rows").css("height", height-300);
+			$("#rows").css("height", height-420);
 		}
 		initHeight()
 		
@@ -255,10 +299,26 @@
 				return;
 			}
 	        var param = {};
+	        /*
 	        for(var i=0; i<search_query.length; i++){
 	        	var query = search_query[i].split(":");
 	        	param[query[0]]=query[1];
 	        }
+	        */
+	        if($("#_search_params").val()!=""){
+	        	param.query_string= $("#_search_params").val();
+	        }else{
+	        	var query = $("#_search").val().split(":");
+		        param.field= query[0];
+		        param.condition= query[1];
+		        param.size = $("#_search_size").val();
+		        if($("#_fuzziness").prop("checked")){
+		        	param.fuzziness= "Y";
+		        }else{
+		        	
+		        }
+	        }
+	        
 	    	param = JSON.stringify(param);
 	    	var request_type = "POST";
 	    	var content_type = "application/json; charset=UTF-8";
@@ -266,17 +326,21 @@
 			var call_url = contextPath+"/elastic/search/"+index+"/"+type;
 			
 			sendRequest(request_type, call_url, param, content_type, return_data_type, function(params, data){
-				addRow(data);
+				console.log(data);
+				if(data!=null){
+					addRow(data.datas, true);
+				}
 				$("#el_view_data").val(JSON.stringify(data,null,2));
 			}, true);
 		}
+		
 		function sendGet(index, type, id){
 	        var param = {};
 	    	param = JSON.stringify(param);
 	    	var request_type = "POST";
 	    	var content_type = "application/json; charset=UTF-8";
 			var return_data_type = 'json';
-			var call_url = contextPath+"/elastic/put/"+index+"/"+type+"/"+id;
+			var call_url = contextPath+"/elastic/get/"+index+"/"+type+"/"+id;
 			
 			sendRequest(request_type, call_url, param, content_type, return_data_type, function(params, data){
 				addRow(data);
@@ -287,10 +351,11 @@
 		function sendPut(index, type, id){
 	        var param = {};
 
-			var chks = $("input[type=checkbox]");
+			var chks = $(".check");
 			if(chks.length>0){
 				for(var i=0; i<chks.length; i++){
 					var idx = chks[i].value.replace("row_", "");
+					console.log("idx>"+idx)
 					if($("#key_"+idx).val()==""){
 						$("#key_"+idx).focus();
 						return;

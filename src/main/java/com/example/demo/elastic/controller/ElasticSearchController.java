@@ -50,27 +50,23 @@ public class ElasticSearchController {
     		) {
     	Map<String, Object> resultMap = null;
     	try {
-    		Map<String, List<String>> searchWordMap = new HashMap<String, List<String>>();
-    		if(data!=null) {
-    			Set<String> keys = data.keySet();
-    			for(String key : keys) {
-    				List<String> list = new ArrayList<String>();
-    				searchWordMap.put(key, list);
-    				
-    				String[] values = (String[])data.get(key);
-    				for(String value : values) {
-    					list.add(value);
-    				}
-    			}
-    		}
+    		int size = data.get("size")!=null&&!data.get("size").toString().trim().equals("")?Integer.parseInt(data.get("size").toString().trim()):10;
+    		int from = data.get("from")!=null&&!data.get("from").toString().trim().equals("")?Integer.parseInt(data.get("from").toString().trim()):0;
+    		boolean isFuzziness = data.get("fuzziness")!=null&&data.get("fuzziness").toString().trim().equals("Y")?true:false; 
+    		String query_string = data.get("query_string")!=null?data.get("query_string").toString():"";
     		ElasticClient elApi = new ElasticClient(host, port);
     		elApi.connect();
-    		resultMap = elApi.sendSearch(index, type, searchWordMap);
+    		if(query_string.equals("")) {
+    			resultMap = elApi.sendSearch(index, type, data.get("field").toString(), data.get("condition").toString(), from, size, isFuzziness);
+    		}else {
+    			resultMap = elApi.sendSearch(index, type, query_string);
+    		}
     		elApi.disconnect();
     	}catch(Exception e) {
     		resultMap = new HashMap<String, Object>();
     		resultMap.put("error_code", -1);
     		resultMap.put("error_result", e.toString());
+    		e.printStackTrace();
     	}
 
         response.setStatus( HttpServletResponse.SC_OK  );

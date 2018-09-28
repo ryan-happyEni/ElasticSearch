@@ -1,6 +1,6 @@
 package com.example.demo.elastic.client;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -18,6 +18,7 @@ import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.MultiSearchRequest;
 import org.elasticsearch.action.search.MultiSearchResponse;
 import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -25,6 +26,9 @@ import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.script.ScriptType;
+import org.elasticsearch.script.mustache.SearchTemplateRequest;
+import org.elasticsearch.script.mustache.SearchTemplateResponse;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 
@@ -87,8 +91,143 @@ public class ElasticClient {
 	    return searchRequest;
 	}
 
+
+	public Map<String, Object> sendSearch(String indexs, String types) {
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+    	try {
+		    resultMap.put("datas", new LinkedList<Map<String, Object>>());
+    		if(isConnected()) {
+				if(indexs==null || indexs.trim().equals("")) {
+					indexs="_all";
+				}
+				
+    			if(types!=null && !types.trim().equals("")) {
+    				SearchRequest searchRequest = new SearchRequest(indexs); 
+    				searchRequest.types(types);
+    				
+    				SearchResponse response = client.search(searchRequest, RequestOptions.DEFAULT);
+    					
+					resultMap.put("datas", response.toString());
+    			}
+    		}else {
+        		resultMap.put("error_code", -2);
+        		resultMap.put("result", "not connected.");
+    		}
+    	}catch(Exception e) {
+    		e.printStackTrace();
+    		resultMap.put("error_code", -1);
+    		resultMap.put("result", e.toString());
+    	}
+    	return resultMap;
+	}
 	
-	public Map<String, Object> sendSearch(String index, String type, Map<String, List<String>> searchWordMap) {
+	public Map<String, Object> sendSearch(String indexs, String types, String field, String value, int from, int size, boolean isFuzziness) {
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+    	try {
+		    resultMap.put("datas", new LinkedList<Map<String, Object>>());
+    		if(isConnected()) {
+				if(indexs==null || indexs.trim().equals("")) {
+					indexs="_all";
+				}
+				
+    			if(types!=null && !types.trim().equals("") && value!=null && !value.trim().equals("")) {
+    				
+    				StringBuilder script = new StringBuilder();
+    				script.append("{");
+    				script.append(" \"size\" : \"{{size}}\", ");
+    				script.append(" \"from\" : \"{{from}}\", ");
+    				script.append(" \"query\": { ");
+    				script.append(" 	\"match\": { ");
+    				if(isFuzziness) {
+        				script.append(" 		\"{{field}}\": { ");
+        				script.append(" 			\"query\" : \"{{value}}\", ");
+        				script.append(" 			\"fuzziness\" : \"AUTO\" ");
+        				script.append(" 		} ");
+    					
+    				}else {
+        				script.append(" 		\"{{field}}\" : \"{{value}}\" ");
+    				}
+    				script.append(" 	} ");
+    				script.append(" } ");
+    				script.append("}");
+    				
+    				SearchTemplateRequest searchRequest = new SearchTemplateRequest();
+    				searchRequest.setRequest(new SearchRequest(indexs)); 
+    				searchRequest.setScriptType(ScriptType.INLINE);
+    				searchRequest.setScript(script.toString());
+
+    				Map<String, Object> scriptParams = new HashMap<>();
+    				scriptParams.put("field", field);
+    				scriptParams.put("value", value);
+    				scriptParams.put("size", size);
+    				scriptParams.put("from", from);
+    				searchRequest.setScriptParams(scriptParams);
+    				
+    				SearchTemplateResponse response = client.searchTemplate(searchRequest, RequestOptions.DEFAULT);
+
+    				List<SearchHit> sourceList = new ArrayList<SearchHit>();
+    			    for (SearchHit hit : response.getResponse().getHits()) {
+    			    	sourceList.add(hit);
+    			    }
+
+					resultMap.put("datas", sourceList);
+    			}
+    		}else {
+        		resultMap.put("error_code", -2);
+        		resultMap.put("result", "not connected.");
+    		}
+    	}catch(Exception e) {
+    		e.printStackTrace();
+    		resultMap.put("error_code", -1);
+    		resultMap.put("result", e.toString());
+    	}
+    	return resultMap;
+	}
+	
+	public Map<String, Object> sendSearch(String indexs, String types, String query_string) {
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+    	try {
+		    resultMap.put("datas", new LinkedList<Map<String, Object>>());
+    		if(isConnected()) {
+				if(indexs==null || indexs.trim().equals("")) {
+					indexs="_all";
+				}
+				
+    			if(types!=null && !types.trim().equals("") && query_string!=null && !query_string.trim().equals("")) {
+    				StringBuilder script = new StringBuilder();
+    				script.append(query_string);
+    				
+    				SearchTemplateRequest searchRequest = new SearchTemplateRequest();
+    				searchRequest.setRequest(new SearchRequest(indexs)); 
+    				searchRequest.setScriptType(ScriptType.INLINE);
+    				searchRequest.setScript(script.toString());
+
+    				Map<String, Object> scriptParams = new HashMap<>();
+    				searchRequest.setScriptParams(scriptParams);
+    				
+    				SearchTemplateResponse response = client.searchTemplate(searchRequest, RequestOptions.DEFAULT);
+
+    				List<SearchHit> sourceList = new ArrayList<SearchHit>();
+    			    for (SearchHit hit : response.getResponse().getHits()) {
+    			    	sourceList.add(hit);
+    			    }
+
+					resultMap.put("datas", sourceList);
+    			}
+    		}else {
+        		resultMap.put("error_code", -2);
+        		resultMap.put("result", "not connected.");
+    		}
+    	}catch(Exception e) {
+    		e.printStackTrace();
+    		resultMap.put("error_code", -1);
+    		resultMap.put("result", e.toString());
+    	}
+    	return resultMap;
+	}
+
+	
+	public Map<String, Object> sendMultiSearch(String index, String type, Map<String, List<String>> searchWordMap) {
 		Map<String, Object> resultMap = new HashMap<String, Object>();
     	try {
 		    resultMap.put("datas", new LinkedList<Map<String, Object>>());
@@ -97,6 +236,7 @@ public class ElasticClient {
     				
     				Set<String> keys = searchWordMap.keySet();
     				if(keys.size()>0) {
+    					/*
 	    				MultiSearchRequest request = new MultiSearchRequest();
 
 	    				for(String key : keys) {
@@ -113,9 +253,29 @@ public class ElasticClient {
 	    			        	datas.add(hit.getSourceAsMap());
 	    			        }
 	    			    }
-	    			    resultMap.put("datas", datas);
+	    			    */
     				}
     			}
+
+			    
+			    MultiSearchRequest request = new MultiSearchRequest();    
+			    SearchRequest firstSearchRequest = new SearchRequest();   
+			    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+			    searchSourceBuilder.query(QueryBuilders.matchQuery("name", "Test"));
+			    firstSearchRequest.source(searchSourceBuilder);
+			    request.add(firstSearchRequest);                          
+			    SearchRequest secondSearchRequest = new SearchRequest();  
+			    searchSourceBuilder = new SearchSourceBuilder();
+			    searchSourceBuilder.query(QueryBuilders.matchQuery("user", "123"));
+			    secondSearchRequest.source(searchSourceBuilder);
+			    request.add(secondSearchRequest);
+			    
+			    SearchRequest searchRequest = new SearchRequest(index); 
+			    searchRequest.types(type);
+			    
+			    MultiSearchResponse response = client.msearch(request, RequestOptions.DEFAULT);
+			    
+			    resultMap.put("datas", response.toString());
     		}else {
         		resultMap.put("error_code", -2);
         		resultMap.put("result", "not connected.");
