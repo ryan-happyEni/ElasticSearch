@@ -1,2 +1,2 @@
 # ElasticSearch
-Elastic search for Java
+Elastic search with Java
